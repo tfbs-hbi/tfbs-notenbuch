@@ -1,0 +1,16 @@
+{
+  "name": "TFBS Notenbuch",
+  "short_name": "Notenbuch",
+  "description": "Noten, Stunden, ToDos und Mitarbeit aus dem TFBS Notenbuch",
+  "lang": "de",
+  "start_url": "./#heute",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F3F5F8",
+  "theme_color": "#1F3864",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

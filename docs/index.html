@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F3864">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client https://apis.google.com https://*.gstatic.com; connect-src 'self' https://www.googleapis.com https://accounts.google.com; frame-src https://accounts.google.com https://docs.google.com https://drive.google.com; img-src 'self' data: https://*.googleusercontent.com https://*.gstatic.com; style-src 'self' 'unsafe-inline' https://accounts.google.com https://*.gstatic.com">
+<meta name="robots" content="noindex">
+<title>TFBS Notenbuch</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="stylesheet" href="stil.css">
+</head>
+<body>
+<header class="kopf"><a href="#heute" class="titel">Notenbuch</a><button type="button" id="stand" class="stand" title="Tippen zum Aktualisieren"></button><a href="#einstellungen" class="zahnrad" aria-label="Einstellungen">⚙</a></header>
+<main id="inhalt"><p class="ged">Wird geladen …</p></main>
+<nav id="tabs" class="tabs" hidden>
+  <a href="#heute" data-tab="heute"><span>◷</span>Heute</a>
+  <a href="#woche" data-tab="woche"><span>▦</span>Woche</a>
+  <a href="#klassen" data-tab="klassen"><span>☰</span>Klassen</a>
+  <a href="#todos" data-tab="todos"><span>☐</span>ToDos</a>
+</nav>
+<div id="meldung" class="meldung" role="status"></div>
+<script src="konfig.js"></script>
+<script src="calc.js"></script>
+<script src="zusammenfuehren.js"></script>
+<script src="krypto.js"></script>
+<script src="daten.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
