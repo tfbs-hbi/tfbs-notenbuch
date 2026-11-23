@@ -82,7 +82,17 @@
     const t = heute(), m = jetztMin();
     return Z.st.stunden.filter(s => klasseFuer(s) === k && !ausgefallen(s) && (s.datum > t || (s.datum === t && minuten(s.ende) > m))).sort((a, b) => (a.datum + a.beginn).localeCompare(b.datum + b.beginn))[0] || null;
   }
-  const offeneTodos = k => (k ? k.todos || [] : Z.st.todos || []).filter(t => !t.erledigt);
+  // ToDos: fällige zuerst (wie im Programm ab 2.1.1)
+  const faellig = t => (t && /^\d{4}-\d{2}-\d{2}$/.test(t.faellig || '') ? t.faellig : null);
+  const nachFaellig = (a, b) => { const fa = faellig(a), fb = faellig(b); if (fa && fb && fa !== fb) return fa < fb ? -1 : 1; if (!!fa !== !!fb) return fa ? -1 : 1; return String(a.erstellt || '').localeCompare(String(b.erstellt || '')); };
+  const offeneTodos = k => (k ? k.todos || [] : Z.st.todos || []).filter(t => !t.erledigt).sort(nachFaellig);
+  const lage = t => { const f = faellig(t); if (!f || t.erledigt) return null; const h = heute(); return f < h ? 'ueber' : f === h ? 'heute' : f === plus(h, 1) ? 'morgen' : 'spaeter'; };
+  const faelligText = t => { const f = faellig(t), l = lage(t); if (!f) return ''; return l === 'ueber' ? `überfällig · ${kurz(f)}` : l === 'heute' ? 'heute fällig' : l === 'morgen' ? 'morgen fällig' : `fällig ${wtag(f).slice(0, 2)} ${kurz(f)}`; };
+  const alleFaelligen = () => [{ k: null, l: Z.st.todos || [] }, ...Z.st.klassen.map(k => ({ k, l: k.todos || [] }))].flatMap(({ k, l }) => l.filter(t => !t.erledigt && faellig(t) && t.faellig <= heute()).map(t => ({ k, t }))).sort((a, b) => a.t.faellig.localeCompare(b.t.faellig));
+  // Rollen (Klassensprecher/in …) wie im Programm
+  const ROLLEN = { 'Klassensprecher/in': 'KS', 'Klassensprecher-Stellvertreter/in': 'KS-Stv.', 'Schulsprecher/in': 'SS', 'Schulsprecher-Stellvertreter/in': 'SS-Stv.' };
+  const rollen = s => (Array.isArray(s.rollen) ? s.rollen.filter(r => typeof r === 'string' && r) : []);
+  const rollenMarken = (s, lang) => rollen(s).map(r => `<span class="rolle" title="${esc(r)}">${esc(lang ? r : ROLLEN[r] || r)}</span>`).join('');
   const fachName = k => { const f = (Z.st.faecher || []).find(x => x.id === k.fachId); return f ? f.name : ''; };
 
   // ---------- Bausteine ----------
@@ -117,6 +127,7 @@
           <div class="gross">${nk ? esc(nk.name) + ' <span class="ged">' + esc(nk.fach) + '</span>' : esc(n.titel)}</div>
           <div>${esc(n.beginn)}–${esc(n.ende)}${n.ort ? ' · ' + esc(n.ort) : ''}</div>${n.thema ? `<div class="thema">${esc(n.thema)}</div>` : ''}
           ${nk && offeneTodos(nk).length ? `<div class="klein">☐ ${offeneTodos(nk).map(x => esc(x.text)).join(' · ')}</div>` : ''}</div>` : ''}
+        ${alleFaelligen().length ? `<h2 class="rot">Fällige ToDos</h2><div class="liste">${alleFaelligen().map(x => todoZeile(x.t, x.k, true)).join('')}</div>` : ''}
         ${tag !== t ? '<p class="ged klein">Heute keine Stunden – der nächste Schultag:</p>' : ''}
         <div class="liste">${liste.map(s => stundeZeile(s)).join('') || '<p class="ged">Keine Stunden im Stundenplan. Der Stundenplan kommt aus dem Programm am PC.</p>'}</div>
         ${allg.length ? `<h2>Allgemeine ToDos</h2><div class="liste">${allg.map(x => todoZeile(x, null)).join('')}</div>` : ''}`;
@@ -177,7 +188,7 @@
         ${n ? `<p class="klein">Nächste Stunde: <b>${wtag(n.datum).slice(0, 2)} ${kurz(n.datum)} ${esc(n.beginn)}</b>${n.ort ? ' · ' + esc(n.ort) : ''}${n.thema ? ` · ${esc(n.thema)}` : ''}</p>` : ''}
         <div class="spiegel">${kr.spiegel.map(z => `<span class="${stufeKlasse(z.code)}">${esc(notenText(z.wert))}<b>${z.vorschlag}</b></span>`).join('')}<span class="ged">Ø ${kr.schnitt !== null && kr.schnitt !== undefined ? Calc.fmt(kr.schnitt, 2) : '–'}</span></div>
         <table class="noten"><thead><tr><th>Name</th><th>Ø</th><th>Note</th><th title="Mitarbeit">MA</th></tr></thead><tbody>
-        ${zeilen.map(({ s, r }) => `<tr data-go="#schueler/${k.id}/${s.id}" class="${r.fruehwarnung ? 'fw' : ''}"><td>${esc(s.name)}${r.offen.length ? ` <span class="marke">${r.offen.length} offen</span>` : ''}</td><td>${r.schnitt !== null ? Calc.fmt(r.schnitt, 2) : '–'}</td><td><span class="note ${r.note ? 'st' + r.note : ''}">${esc(notenText(r.note))}</span>${r.grenzfall ? '<small title="Grenzfall">±</small>' : ''}${(s.zeugnisnote !== null && s.zeugnisnote !== undefined && s.zeugnisnote !== '') ? `<small> Z ${esc(notenText(Number(s.zeugnisnote)))}</small>` : ''}</td><td>${r.tendenz || ''}<small> ${r.plus}/${r.minus}</small></td></tr>`).join('')}
+        ${zeilen.map(({ s, r }) => `<tr data-go="#schueler/${k.id}/${s.id}" class="${r.fruehwarnung ? 'fw' : ''}"><td>${esc(s.name)}${rollenMarken(s)}${r.offen.length ? ` <span class="marke">${r.offen.length} offen</span>` : ''}</td><td>${r.schnitt !== null ? Calc.fmt(r.schnitt, 2) : '–'}</td><td><span class="note ${r.note ? 'st' + r.note : ''}">${esc(notenText(r.note))}</span>${r.grenzfall ? '<small title="Grenzfall">±</small>' : ''}${(s.zeugnisnote !== null && s.zeugnisnote !== undefined && s.zeugnisnote !== '') ? `<small> Z ${esc(notenText(Number(s.zeugnisnote)))}</small>` : ''}</td><td>${r.tendenz || ''}<small> ${r.plus}/${r.minus}</small></td></tr>`).join('')}
         </tbody></table>
         <h2>ToDos der Klasse</h2><div class="liste">${offeneTodos(k).map(x => todoZeile(x, k)).join('') || '<p class="ged klein">Keine offenen ToDos.</p>'}</div>
         <form class="neu" data-todo-neu="${k.id}"><input name="text" placeholder="Neues ToDo für ${esc(k.name)}" maxlength="300" autocomplete="off"><button class="knopf primaer">+</button></form>`;
@@ -191,7 +202,7 @@
           return `<div class="zeile"><span>${esc(it.bez)}${it.datum ? ` <span class="ged klein">${kurz(it.datum)}</span>` : ''}${e && e.kommentar ? `<br><span class="ged klein">${esc(e.kommentar)}</span>` : ''}</span><span class="note ${st ? stufeKlasse(st) : ''}">${e && e.fehlt ? 'f' : e && e.befreit ? '–' : b === 'sa' && st ? Calc.stufeWert(S(), st) : esc(stufeText(st)) || '·'}</span></div>`; }).join('')}</div>`; };
       const ma = (s.mitarbeit || []).slice().reverse();
       const tb = S().textbausteine || {};
-      return `<div class="kopfzeile"><button class="knopf" data-go="#klasse/${k.id}" aria-label="Zurück">‹</button><h1>${esc(s.name)}</h1></div>
+      return `<div class="kopfzeile"><button class="knopf" data-go="#klasse/${k.id}" aria-label="Zurück">‹</button><h1>${esc(s.name)}${rollenMarken(s, true)}</h1></div>
         <div class="karte"><div class="gross"><span class="note ${r.note ? 'st' + r.note : ''}">${esc(notenText(r.note))}</span> ${esc(r.noteName || '')}</div>
           <div class="klein">Ø ${r.schnitt !== null ? Calc.fmt(r.schnitt, 2) : '–'}${r.grenzfall ? ' · Grenzfall' : ''} · Mitarbeit ${r.plus} + / ${r.minus} −${r.tendenz ? ' ' + r.tendenz : ''}${(s.zeugnisnote !== null && s.zeugnisnote !== undefined && s.zeugnisnote !== '') ? ` · Zeugnis ${esc(notenText(Number(s.zeugnisnote)))}` : ''}</div>
           ${r.fruehwarnung ? '<div class="rot klein">Frühwarnung</div>' : ''}${r.offen.length ? `<div class="klein">Offen: ${r.offen.map(o => esc(o.item.bez) + (o.grund === 'fehlt' ? ' (fehlt)' : '')).join(', ')}</div>` : ''}
@@ -272,7 +283,13 @@
   }
   const blattZu = () => { const b = $('#blatt'); if (b) b.remove(); };
   const dauer = m =>m < 60 ? `${m} Min.` : `${Math.floor(m / 60)} Std. ${m % 60 ? (m % 60) + ' Min.' : ''}`.trim();
-  function todoZeile(t, k) { return `<label class="zeile todo"><input type="checkbox" data-todo="${k ? k.id : ''}|${t.id}"><span>${esc(t.text)}${t.datum ? ` <span class="ged klein">${kurz(t.datum)}</span>` : ''}</span></label>`; }
+  function todoZeile(t, k, mitKlasse) {
+    const sch = k && t.schueler ? (k.schueler || []).find(x => x.id === t.schueler) : null;
+    const l = lage(t);
+    const links = (Array.isArray(t.anhaenge) ? t.anhaenge : []).map(m => m.url ? `<a class="anh" href="${esc(m.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(m.name || m.url.replace(/^https?:\/\//, ''))}</a>` : `<span class="anh ged" title="Datei am PC">📄 ${esc(m.name || '')}</span>`).join('');
+    return `<label class="zeile todo"><input type="checkbox" data-todo="${k ? k.id : ''}|${t.id}"><span class="todo-inhalt"><span>${esc(t.text)}${l ? ` <span class="faellig f-${l}">${esc(faelligText(t))}</span>` : t.datum ? ` <span class="ged klein">${kurz(t.datum)}</span>` : ''}</span>
+      ${mitKlasse || sch || t.notiz || links ? `<span class="ged klein">${[mitKlasse ? (k ? esc(k.name) : 'Allgemein') : '', sch ? '👤 ' + esc(sch.name) : '', t.notiz ? esc(t.notiz.split('\n')[0].slice(0, 80)) : ''].filter(Boolean).join(' · ')}</span>${links ? `<span class="anh-liste">${links}</span>` : ''}` : ''}</span></label>`;
+  }
 
   // ---------- Einrichtung ----------
   function einrichtung(fehler) {

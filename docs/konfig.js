@@ -4,4 +4,4 @@ window.NB_WEB_KONFIG = {
   apiKey: 'AIzaSyDljxR2URdXvRnW9cxkPWXJ6WGIbQXCVdE', // API-Schlüssel „Notenbuch Web-App Dateiauswahl“ (nur Picker API, nur https://tfbs-hbi.github.io/*)
   appId: '222719804285' // Projektnummer
 };
-window.NB_WEB_VERSION = '1.1.0';
+window.NB_WEB_VERSION = '1.2.0';

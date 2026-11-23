@@ -156,3 +156,13 @@ body.breit main { max-width: 1100px; padding: 8px 6px; }
 .plan-zeile { margin: 4px 0 8px; }
 .blatt-knoepfe { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
 .blatt-knoepfe .knopf { flex: 1; }
+/* ToDos mit Fälligkeit, Rollen (ab Programm 2.1.1) */
+.todo-inhalt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.faellig { font-size: 12px; border-radius: 8px; padding: 0 6px; white-space: nowrap; background: var(--grund); color: var(--ged); }
+.faellig.f-ueber { background: var(--st5); color: var(--rot); font-weight: 700; }
+.faellig.f-heute { background: var(--st3); font-weight: 700; color: var(--text); }
+.anh-liste { display: flex; flex-wrap: wrap; gap: 4px 8px; font-size: 13px; }
+.anh { text-decoration: none; color: var(--akzent); }
+.rolle { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 0 6px; background: var(--grund); border: 1px solid var(--linie); color: var(--akzent); vertical-align: 2px; }
+h1 .rolle { font-size: 13px; font-weight: 600; }
+h2.rot { color: var(--rot); }
