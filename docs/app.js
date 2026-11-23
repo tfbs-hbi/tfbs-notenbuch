@@ -27,7 +27,12 @@
   const stufeKlasse = code => { const s = S().stufen.find(x => String(x.code).toUpperCase() === String(code || '').toUpperCase()); return s ? 'st' + Math.max(1, Math.min(5, Math.round(Number(s.wert)))) : ''; };
   const notenText = wert => { if (wert === null || wert === undefined) return '–'; if (mitNoten()) return String(wert); const s = S().stufen.find(x => Number(x.wert) === Number(wert)); return s ? s.code : String(wert); };
   const schluessel = st => (st.titel + '|' + (st.info || '').split('\n')[0]).toLowerCase();
+  let kfCache = new WeakMap(); // je Zeichnen neu – die Woche fragt oft nach derselben Stunde
   function klasseFuer(st) {
+    if (kfCache.has(st)) return kfCache.get(st);
+    const k = klasseSuchen(st); kfCache.set(st, k); return k;
+  }
+  function klasseSuchen(st) {
     if (st.eigen) return null;
     if (st.klasseId && klasse(st.klasseId)) return klasse(st.klasseId);
     const z = (Z.st.zuordnung || {})[schluessel(st)];
@@ -38,7 +43,45 @@
     return t.length === 1 ? t[0] : null;
   }
   const stundenAm = t => Z.st.stunden.filter(s => s.datum === t).sort((a, b) => a.beginn.localeCompare(b.beginn));
-  const ausgefallen = s => !!(s.entfall || s.nichtGehalten || s.eigenAus);
+  const ausgefallen = s => !!(s.entfall || s.nichtGehalten);
+  const statusText = s => s.nichtGehalten ? 'nicht gehalten' + (s.nichtGehalten.grund ? ' – ' + s.nichtGehalten.grund : '') : s.entfall ? 'entfallen laut WebUntis' : '';
+  const EIGEN_ARTEN = { supplierung: 'Supplierung', aufsicht: 'Aufsicht', sonstiges: 'Sonstiges' };
+
+  // ---------- Planung und Farben wie im Programm (Wochenansicht) ----------
+  const planungAn = () => S().planung !== false;
+  const fach = id => (Z.st.faecher || []).find(f => f.id === id) || null;
+  const ordnerVon = f => f && f.ordnerId ? (Z.st.fachOrdner || []).find(o => o.id === f.ordnerId) || null : null;
+  const FARBEN = ['blau', 'gruen', 'rot', 'orange', 'lila', 'tuerkis', 'gelb', 'pink', 'braun', 'grau'];
+  const farbeOk = c => FARBEN.includes(c);
+  const fachFarbe = f => (f && farbeOk(f.farbe) ? f.farbe : null) || (ordnerVon(f) && farbeOk(ordnerVon(f).farbe) ? ordnerVon(f).farbe : null);
+  const einheitEnde = x => (Number(x.ab) || 1) + (Number(x.ue) || 1) - 1;
+  // Themen einer Stunde, je Thema zusammengefasst: [{ e, bereiche, einheiten }]
+  function planEintraege(st) {
+    const k = klasseFuer(st);
+    if (!k || !Array.isArray(st.plan) || !planungAn()) return [];
+    const out = [];
+    st.plan.forEach(p => {
+      const e = (k.einsaetze || []).find(x => x.id === p.einsatz); if (!e) return;
+      let z = out.find(x => x.e === e); if (!z) { z = { e, bereiche: [] }; out.push(z); }
+      z.bereiche.push([p.von, p.bis]);
+    });
+    out.forEach(z => {
+      z.bereiche.sort((a, b) => a[0] - b[0]);
+      z.einheiten = (z.e.einheiten || []).slice().sort((a, b) => a.ab - b.ab || a.ue - b.ue).filter(x => z.bereiche.some(([v, b]) => x.ab <= b && einheitEnde(x) >= v));
+    });
+    return out;
+  }
+  const ueText = z => { const g = Math.max(1, Number(z.e.ue) || 1); if (g <= 1) return ''; return z.bereiche.map(([v, b]) => v === b ? `${v}` : `${v}–${b}`).join(', ') + '/' + g; };
+  const teileText = z => z.einheiten.map(y => y.titel || y.art).filter(Boolean).filter(t => t !== z.e.titel);
+  const fachDerStunde = (k, st) => { if (k.fachId && fach(k.fachId)) return fach(k.fachId); const z = planEintraege(st).find(x => x.e.fachId && fach(x.e.fachId)); return z ? fach(z.e.fachId) : null; };
+  const klassenFarbe = k => { const g = Z.st.klassen.filter(x => x.lehrgangId === k.lehrgangId).sort((a, b) => (a.name + ' ' + a.fach).localeCompare(b.name + ' ' + b.fach, 'de')); return (g.indexOf(k) % 8) + 1; };
+  const einheiten = st => { const l = Number(S().stundenplan && S().stundenplan.laenge) || 50; const d = minuten(st.ende) - minuten(st.beginn); return d > 0 ? Math.max(1, Math.round(d / l)) : 1; };
+  // Nächste Stunde einer Klasse mit offenen ToDos (läuft sie gerade, zählt sie noch) – dort steht ☐ n wie im Programm
+  function naechsteMitTodo(k) {
+    if (!offeneTodos(k).length) return null;
+    const t = heute(), m = jetztMin();
+    return Z.st.stunden.filter(s => klasseFuer(s) === k && !ausgefallen(s) && (s.datum > t || (s.datum === t && minuten(s.ende) > m))).sort((a, b) => (a.datum + a.beginn).localeCompare(b.datum + b.beginn))[0] || null;
+  }
   const offeneTodos = k => (k ? k.todos || [] : Z.st.todos || []).filter(t => !t.erledigt);
   const fachName = k => { const f = (Z.st.faecher || []).find(x => x.id === k.fachId); return f ? f.name : ''; };
 
@@ -48,7 +91,7 @@
     const titel = s.eigen ? esc(s.eigen.name || 'Eigener Eintrag') : k ? `${esc(k.name)} <span class="ged">${esc(k.fach)}</span>` : esc(s.titel);
     const todo = k ? offeneTodos(k).length : 0;
     const vorbei = s.datum < heute() || (s.datum === heute() && minuten(s.ende) <= jetztMin());
-    return `<button class="stunde ${vorbei ? 'vorbei' : ''} ${ausgefallen(s) ? 'aus' : ''} ${s.eigen ? 'eigen' : ''}" ${k ? `data-go="#klasse/${k.id}"` : 'disabled'}>
+    return `<button class="stunde ${vorbei ? 'vorbei' : ''} ${ausgefallen(s) ? 'aus' : ''} ${s.eigen ? 'eigen' : ''}" data-stunde="${esc(s.id)}">
       <span class="zeit">${esc(s.beginn)}<small>${esc(s.ende)}</small></span>
       <span class="inhalt"><b>${titel}</b>${s.ort ? ` <span class="ged">· ${esc(s.ort)}</span>` : ''}${mitDatum ? ` <span class="ged">· ${wtag(s.datum).slice(0, 2)} ${kurz(s.datum)}</span>` : ''}
         ${s.thema ? `<span class="thema">${esc(s.thema)}</span>` : ''}${ausgefallen(s) ? `<span class="thema rot">${s.entfall ? 'entfallen' : 'nicht gehalten'}</span>` : ''}</span>
@@ -78,12 +121,44 @@
         <div class="liste">${liste.map(s => stundeZeile(s)).join('') || '<p class="ged">Keine Stunden im Stundenplan. Der Stundenplan kommt aus dem Programm am PC.</p>'}</div>
         ${allg.length ? `<h2>Allgemeine ToDos</h2><div class="liste">${allg.map(x => todoZeile(x, null)).join('')}</div>` : ''}`;
     },
+    // Woche wie im Programm: Montag bis Freitag nebeneinander, Stunden als Blöcke nach Uhrzeit, Farbe des Fachs
     woche(p) {
       const mo = montag(p[0] || heute());
       const tage = [0, 1, 2, 3, 4].map(i => plus(mo, i));
-      return `<div class="kopfzeile"><button class="knopf" data-go="#woche/${plus(mo, -7)}" aria-label="Woche zurück">‹</button><h1>KW ${kw(mo)} <span class="ged">${kurz(mo)}–${kurz(plus(mo, 4))}</span></h1><button class="knopf" data-go="#woche/${plus(mo, 7)}" aria-label="Woche vor">›</button></div>
-        ${mo !== montag(heute()) ? '<button class="knopf leise klein" data-go="#woche">Diese Woche</button>' : ''}
-        ${tage.map(t => { const l = stundenAm(t); return `<section class="tag ${t === heute() ? 'heute' : ''}"><h2>${wtag(t)} <span class="ged">${kurz(t)}</span></h2><div class="liste">${l.map(s => stundeZeile(s)).join('') || '<p class="ged klein">frei</p>'}</div></section>`; }).join('')}`;
+      const diese = mo === montag(heute());
+      const stunden = Z.st.stunden.filter(s => s.datum >= tage[0] && s.datum <= tage[4]);
+      const ue = stunden.filter(s => klasseFuer(s) && !ausgefallen(s)).reduce((a, s) => a + einheiten(s), 0);
+      let von = 8 * 60, bis = 16 * 60;
+      if (stunden.length) { von = Math.floor(Math.min(...stunden.map(s => minuten(s.beginn))) / 60) * 60; bis = Math.ceil(Math.max(...stunden.map(s => minuten(s.ende))) / 60) * 60; }
+      // Pixel je Minute: der ganze Schultag soll ins Handy passen (Kopf, Wochenzeile und Reiter abgezogen)
+      const px = Math.max(0.75, Math.min(1.6, (window.innerHeight - 230) / Math.max(60, bis - von)));
+      const hoehe = (bis - von) * px;
+      let skala = '';
+      for (let m = von; m <= bis; m += 60) skala += `<div class="wz-zeit" style="top:${(m - von) * px}px">${m / 60}</div>`;
+      const h = heute(), jetzt = jetztMin();
+      const spalten = tage.map(d => {
+        const ds = stunden.filter(s => s.datum === d).sort((a, b) => a.beginn.localeCompare(b.beginn));
+        const enden = [], spur = new Map(); // überschneidende Termine nebeneinander
+        ds.forEach(s => { const b = minuten(s.beginn); let i = enden.findIndex(e => e <= b); if (i < 0) { i = enden.length; enden.push(0); } enden[i] = minuten(s.ende); spur.set(s, i); });
+        const n = Math.max(1, enden.length);
+        const linie = d === h && jetzt >= von && jetzt <= bis ? `<div class="wt-jetzt" style="top:${(jetzt - von) * px}px"></div>` : '';
+        const wt = new Date(d + 'T12:00:00').toLocaleDateString('de-AT', { weekday: 'short' }).replace('.', '');
+        return `<div class="wt ${d === h ? 'heute' : ''}"><button class="wt-kopf" data-go="#tag/${d}">${esc(wt)}<b>${kurz(d)}</b></button>
+          <div class="wt-raster" style="height:${hoehe}px;background-size:100% ${60 * px}px">${ds.map(s => wochenBlock(s, spur.get(s), n, von, px)).join('')}${linie}</div></div>`;
+      }).join('');
+      return `<div class="kopfzeile woche-kopf"><button class="knopf" data-go="#woche/${plus(mo, -7)}" aria-label="Woche zurück">‹</button>
+          <h1>${diese ? 'Diese Woche' : 'Woche ' + kw(mo)}<span class="ged klein">KW ${kw(mo)} · ${kurz(mo)}–${kurz(plus(mo, 4))}${ue ? ` · ${ue} UE` : ''}</span></h1>
+          ${diese ? '' : '<button class="knopf klein" data-go="#woche">Diese Woche</button>'}
+          <button class="knopf" data-go="#woche/${plus(mo, 7)}" aria-label="Woche vor">›</button></div>
+        <div class="woche" data-mo="${mo}"><div class="wz"><div class="wz-kopf"></div><div class="wz-skala" style="height:${hoehe}px">${skala}</div></div>${spalten}
+          ${stunden.length ? '' : '<div class="woche-leer">Keine Stunden in dieser Woche</div>'}</div>
+        <p class="ged klein hinweis">Stunde antippen für Details · Tag antippen für die Liste · wischen für die nächste Woche</p>`;
+    },
+    tag(p) {
+      const t = p[0] || heute();
+      const l = stundenAm(t);
+      return `<div class="kopfzeile"><button class="knopf" data-go="#woche/${t}" aria-label="Zur Woche">‹</button><h1>${t === heute() ? 'Heute, ' : ''}${wtag(t)} <span class="ged">${datum(t)}</span></h1></div>
+        <div class="liste">${l.map(s => stundeZeile(s)).join('') || '<p class="ged">Keine Stunden an diesem Tag.</p>'}</div>`;
     },
     klassen() {
       const k = Z.st.klassen.slice();
@@ -144,7 +219,59 @@
         <p class="klein ged">TFBS Notenbuch Web ${esc(window.NB_WEB_VERSION || '')} · © 2026 Werner Scheyrer, BEd</p>`;
     }
   };
-  const dauer = m => m < 60 ? `${m} Min.` : `${Math.floor(m / 60)} Std. ${m % 60 ? (m % 60) + ' Min.' : ''}`.trim();
+  // Ein Block in der Woche – Inhalt wie im Programm (Klasse, Fach, geplante Themen mit UE, Zeit, Ort, ToDos, Status)
+  function wochenBlock(s, spur, n, von, px) {
+    const k = klasseFuer(s);
+    const b = minuten(s.beginn), e = minuten(s.ende);
+    const status = statusText(s);
+    const lage = `top:${(b - von) * px + 1}px;height:${Math.max(18, (e - b) * px - 2)}px;left:calc(${spur * 100 / n}% + 2px);width:calc(${100 / n}% - 4px)`;
+    const kurzKl = (e - b) * px < 34 ? 'kurz' : '';
+    const aus = status ? 'ausfall' : '';
+    if (s.eigen) {
+      return `<button class="wblock eigen ${kurzKl} ${aus} ep-${esc(s.eigen.farbe || 'p0')}" data-stunde="${esc(s.id)}" style="${lage}">
+        <span class="wb-titel">${esc(s.eigen.name || 'Eigener Eintrag')}</span><span class="wb-zeit">${esc(s.beginn)}–${esc(s.ende)}</span>${status ? `<span class="wb-status">${esc(status)}</span>` : ''}</button>`;
+    }
+    const plan = planEintraege(s);
+    const planText = plan.map(z => esc(z.e.titel) + (ueText(z) ? ` <span class="wb-teil">${ueText(z)}</span>` : '') + (teileText(z).length ? `<span class="wb-einheit">${esc(teileText(z).join(', '))}</span>` : '')).join(' · ');
+    const todo = k && naechsteMitTodo(k) === s ? offeneTodos(k).length : 0;
+    let p = 0, m = 0, o = 0;
+    if (k) k.schueler.forEach(x => (x.mitarbeit || []).forEach(y => { if (y.stunde === s.id) { if (y.wert === '+') p++; else if (y.wert === '0') o++; else m++; } }));
+    const marken = [todo ? `<span class="wb-todo">☐ ${todo}</span>` : '', s.thema && !plan.length ? '<span>✓ Thema</span>' : '', p + m + o ? `<span>${[p ? '+' + p : '', m ? '−' + m : '', o ? '○' + o : ''].filter(Boolean).join(' ')}</span>` : ''].join('');
+    const ff = k ? fachFarbe(fachDerStunde(k, s)) : null;
+    const farbe = ff ? 'fc fc-' + ff : 'f' + (k ? klassenFarbe(k) : 0);
+    return `<button class="wblock ${farbe} ${k ? '' : 'offen-zuordnen'} ${kurzKl} ${aus}" data-stunde="${esc(s.id)}" style="${lage}">
+      <span class="wb-titel">${k ? `${esc(k.name)} <span class="wb-fach">${esc(k.fach)}</span>` : esc(s.titel)}</span>
+      ${planText ? `<span class="wb-plan">${planText}</span>` : s.thema ? `<span class="wb-plan">${esc(s.thema)}</span>` : ''}
+      ${status ? `<span class="wb-status">${esc(status)}</span>` : s.supplierung ? '<span class="wb-status suppl">Supplierung</span>' : ''}
+      <span class="wb-zeit">${esc(s.beginn)}–${esc(s.ende)}${s.ort ? ' · ' + esc(s.ort) : ''}</span>
+      ${marken ? `<span class="wb-marken">${marken}</span>` : ''}</button>`;
+  }
+  // Details einer Stunde als Blatt von unten (statt Tooltip im Programm)
+  function stundeDetails(id) {
+    const s = Z.st.stunden.find(x => x.id === id); if (!s) return;
+    const k = klasseFuer(s);
+    const status = statusText(s);
+    const kopf = s.eigen ? esc(s.eigen.name || 'Eigener Eintrag') : k ? `${esc(k.name)} <span class="ged">${esc(k.fach)}</span>` : esc(s.titel);
+    const plan = planEintraege(s);
+    const td = k ? offeneTodos(k) : [];
+    blatt(`<h2 class="blatt-titel">${kopf}</h2>
+      <p>${wtag(s.datum)}, ${datum(s.datum)} · ${esc(s.beginn)}–${esc(s.ende)}${s.ort ? ' · ' + esc(s.ort) : ''}${!s.eigen && einheiten(s) > 1 ? ` · ${einheiten(s) === 2 ? 'Doppelstunde' : einheiten(s) + ' Std.'}` : ''}</p>
+      ${s.eigen ? `<p class="ged klein">${esc(EIGEN_ARTEN[s.eigen.art] || '')}${s.eigen.regel ? ' · jede Woche' : ''} · in WebUntis „${esc(s.titel)}“</p>` : ''}
+      ${status ? `<p class="rot">${esc(status)}</p>` : s.supplierung ? '<p>Supplierung</p>' : ''}
+      ${plan.length ? `<h3>Geplant</h3>${plan.map(z => `<div class="plan-zeile"><b>${esc(z.e.titel)}</b>${ueText(z) ? ` <span class="ged">UE ${ueText(z)}</span>` : ''}${z.einheiten.length ? `<ul>${z.einheiten.map(x => `<li>${esc(x.titel || x.art || 'Unterpunkt')}${x.art && x.titel ? ` <span class="ged klein">${esc(x.art)}</span>` : ''}</li>`).join('')}</ul>` : ''}</div>`).join('')}`
+        : s.thema ? `<h3>Thema</h3><p>${esc(s.thema)}</p>` : ''}
+      ${td.length ? `<h3>Offene ToDos der Klasse</h3><ul>${td.map(x => `<li>${esc(x.text)}</li>`).join('')}</ul>` : ''}
+      <div class="blatt-knoepfe">${k ? `<button class="knopf primaer" data-go="#klasse/${k.id}">Klasse ${esc(k.name)} öffnen</button>` : ''}<button class="knopf" data-akt="blatt-zu">Schließen</button></div>`);
+  }
+  function blatt(html) {
+    blattZu();
+    const h = document.createElement('div'); h.className = 'blatt-huelle'; h.id = 'blatt';
+    h.innerHTML = `<div class="blatt" role="dialog" aria-modal="true">${html}</div>`;
+    h.addEventListener('click', e => { if (e.target === h) blattZu(); });
+    document.body.appendChild(h);
+  }
+  const blattZu = () => { const b = $('#blatt'); if (b) b.remove(); };
+  const dauer = m =>m < 60 ? `${m} Min.` : `${Math.floor(m / 60)} Std. ${m % 60 ? (m % 60) + ' Min.' : ''}`.trim();
   function todoZeile(t, k) { return `<label class="zeile todo"><input type="checkbox" data-todo="${k ? k.id : ''}|${t.id}"><span>${esc(t.text)}${t.datum ? ` <span class="ged klein">${kurz(t.datum)}</span>` : ''}</span></label>`; }
 
   // ---------- Einrichtung ----------
@@ -168,8 +295,10 @@
     const f = ANSICHTEN[name] || ANSICHTEN.heute;
     const neu = [name, ...p].join('/') !== ansicht.join('/');
     ansicht = [name, ...p];
+    kfCache = new WeakMap();
     $('#inhalt').innerHTML = f(p);
-    document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('aktiv', a.dataset.tab === ({ klasse: 'klassen', schueler: 'klassen' }[name] || name)));
+    document.body.classList.toggle('breit', name === 'woche');
+    document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('aktiv', a.dataset.tab === ({ klasse: 'klassen', schueler: 'klassen', tag: 'woche' }[name] || name)));
     if (neu) window.scrollTo(0, 0);
     standZeigen();
   }
@@ -185,10 +314,13 @@
   // ---------- Bedienung ----------
   document.addEventListener('click', async e => {
     const g = e.target.closest('[data-go]');
-    if (g && !e.target.closest('input, label.todo')) { e.preventDefault(); location.hash = g.dataset.go; return; }
+    if (g && !e.target.closest('input, label.todo')) { e.preventDefault(); blattZu(); location.hash = g.dataset.go; return; }
+    const sb = e.target.closest('[data-stunde]');
+    if (sb) { stundeDetails(sb.dataset.stunde); return; }
     const a = e.target.closest('[data-akt]');
     if (!a) return;
     const akt = a.dataset.akt;
+    if (akt === 'blatt-zu') return blattZu();
     try {
       if (akt === 'waehlen' || akt === 'andere') { await D.dateiWaehlen(); if (akt === 'andere') { Z.st = null; } return zeichnen(); }
       if (akt === 'aktualisieren') { await D.aktualisieren(); return meldung(Z.fehler ? Z.fehler : 'Aktuell', Z.fehler ? 'fehler' : ''); }
@@ -225,7 +357,17 @@
       meldung(`Mitarbeit ${w === '+' ? '+' : w === '-' ? '−' : '○'} eingetragen`);
     }
   });
-  window.addEventListener('hashchange', zeichnen);
+  window.addEventListener('hashchange', () => { blattZu(); zeichnen(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') blattZu(); });
+  // In der Woche nach links/rechts wischen = nächste/vorige Woche
+  let wisch = null;
+  document.addEventListener('touchstart', e => { const w = e.target.closest('.woche'); wisch = w && e.touches.length === 1 ? { x: e.touches[0].clientX, y: e.touches[0].clientY, mo: w.dataset.mo } : null; }, { passive: true });
+  document.addEventListener('touchend', e => {
+    if (!wisch) return; const t = e.changedTouches[0]; const dx = t.clientX - wisch.x, dy = t.clientY - wisch.y; const mo = wisch.mo; wisch = null;
+    if (Math.abs(dx) > 70 && Math.abs(dy) < 50) location.hash = '#woche/' + plus(mo, dx < 0 ? 7 : -7);
+  }, { passive: true });
+  // Drehen des Handys: Woche neu einpassen
+  window.addEventListener('resize', () => { clearTimeout(zeichnen.t); zeichnen.t = setTimeout(() => { if (ansicht[0] === 'woche' && Z.st) zeichnen(); }, 150); });
   $('#stand').addEventListener('click', () => { D.aktualisieren(); });
   D.beobachten(() => { if (document.activeElement && /INPUT|SELECT/.test(document.activeElement.tagName) && Z.st) return standZeigen(); zeichnen(); if (Z.hinweis) { meldung(Z.hinweis); Z.hinweis = null; } });
   // beim Zurückkehren in die App und jede Minute aktualisieren (die „nächste Stunde“ wandert mit)
@@ -235,6 +377,11 @@
   (async () => {
     try { if (await D.start()) { zeichnen(); D.aktualisieren(); } else einrichtung(); }
     catch (x) { einrichtung(x.message); }
-    if ('serviceWorker' in navigator && !D.testmodus && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+    if ('serviceWorker' in navigator && !D.testmodus && location.protocol === 'https:') {
+      // Neue Version der App: einmal neu laden, sobald sie bereitsteht (nur wenn vorher schon eine lief)
+      const hatte = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (hatte && !zeichnen.neu) { zeichnen.neu = true; location.reload(); } });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(r => r.update()).catch(() => {});
+    }
   })();
 })();

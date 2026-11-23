@@ -87,3 +87,72 @@ form.mitarbeit { display: flex; flex-direction: column; gap: 8px; background: va
 .meldung { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translate(-50%, 20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; opacity: 0; pointer-events: none; transition: .2s; max-width: 90vw; text-align: center; z-index: 20; }
 .meldung.zeigen { opacity: 1; transform: translate(-50%, 0); }
 .meldung.fehler { background: var(--rot); }
+/* ---------- Woche wie im Programm (Raster Mo–Fr, Blöcke nach Uhrzeit, Farbe des Fachs) ---------- */
+body.breit main { max-width: 1100px; padding: 8px 6px; }
+.woche-kopf h1 { display: flex; flex-direction: column; font-size: 18px; line-height: 1.2; }
+.woche-kopf h1 .klein { font-size: 12.5px; }
+.woche { position: relative; display: grid; grid-template-columns: 26px repeat(5, minmax(0, 1fr)); background: var(--flaeche); border: 1px solid var(--linie); border-radius: 8px; overflow: hidden; margin-top: 6px; touch-action: pan-y; }
+.wz-kopf { height: 34px; border-bottom: 1px solid var(--linie); background: var(--grund); }
+.wz-skala { position: relative; }
+.wz-zeit { position: absolute; right: 4px; transform: translateY(-50%); font-size: 10.5px; color: var(--ged); font-variant-numeric: tabular-nums; }
+.wz-zeit:first-child { transform: none; }
+.wz-zeit:last-child { transform: translateY(-100%); }
+.wt { border-left: 1px solid var(--linie); min-width: 0; }
+.wt-kopf { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; height: 34px; border: 0; border-bottom: 1px solid var(--linie); background: var(--grund); color: var(--ged); font: inherit; font-size: 11px; line-height: 1.15; padding: 0; cursor: pointer; }
+.wt-kopf b { color: var(--text); font-weight: 600; font-size: 11.5px; }
+.wt.heute .wt-kopf, .wt.heute .wt-kopf b { color: var(--rot); }
+.wt.heute .wt-kopf { box-shadow: inset 0 -3px 0 var(--rot); font-weight: 600; }
+.wt.heute .wt-raster { background-color: color-mix(in srgb, var(--akzent) 7%, transparent); }
+.wt-raster { position: relative; background-image: linear-gradient(to bottom, var(--linie) 1px, transparent 1px); }
+.wt-jetzt { position: absolute; left: 0; right: 0; height: 2px; background: var(--rot); z-index: 3; pointer-events: none; }
+.wt-jetzt::before { content: ""; position: absolute; left: -3px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--rot); }
+.woche-leer { position: absolute; left: 26px; right: 0; top: 50%; text-align: center; color: var(--ged); pointer-events: none; }
+.wblock { position: absolute; z-index: 2; display: flex; flex-direction: column; gap: 0; text-align: left; overflow: hidden; border: 0; border-radius: 5px; background: var(--wb-bg); color: var(--text); padding: 2px 4px; font: inherit; font-size: 10.5px; line-height: 1.2; cursor: pointer; }
+.wblock > span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wb-titel { font-weight: 700; font-size: 11.5px; color: var(--wb-text, var(--text)); }
+.wb-fach { font-weight: 500; opacity: .8; }
+.wb-plan { font-weight: 600; }
+.wb-teil, .wb-einheit { font-weight: 500; color: var(--ged); }
+.wb-einheit { display: block; overflow: hidden; text-overflow: ellipsis; }
+.wb-zeit { font-size: 9.5px; color: var(--ged); font-variant-numeric: tabular-nums; }
+.wb-status { font-size: 9.5px; font-weight: 700; color: var(--rot); }
+.wb-status.suppl { color: var(--akzent); }
+.wb-marken { display: flex; gap: 3px; flex-wrap: wrap; }
+.wb-marken span { font-size: 9.5px; font-weight: 600; background: var(--flaeche); color: var(--text); border-radius: 7px; padding: 0 4px; }
+.wb-todo { font-weight: 700; }
+.wblock.kurz { flex-direction: row; align-items: center; padding-top: 0; padding-bottom: 0; }
+.wblock.kurz > :not(.wb-titel) { display: none; }
+.wblock.kurz .wb-titel { font-size: 10px; }
+.wblock.ausfall { opacity: .6; background: repeating-linear-gradient(135deg, var(--wb-bg) 0 8px, transparent 8px 12px); }
+.wblock.ausfall .wb-titel, .wblock.ausfall .wb-plan { text-decoration: line-through; }
+.wblock.f0 { --wb-bg: var(--grund); border: 1px dashed var(--ged); }
+.wblock.offen-zuordnen:not(.ausfall) { border: 1px dashed var(--ged); }
+.hinweis { text-align: center; margin: 8px 0 0; }
+/* Klassenfarben (Klassen ohne Fach) und Fachfarben wie im Programm */
+.wblock.f1 { --wb-bg: #DCE8FA; --wb-text: #1F3F7A; } .wblock.f2 { --wb-bg: #D5F0EC; --wb-text: #155A51; } .wblock.f3 { --wb-bg: #FBE3D2; --wb-text: #7A3E0E; } .wblock.f4 { --wb-bg: #E8E0F6; --wb-text: #4B347D; }
+.wblock.f5 { --wb-bg: #DFF0D6; --wb-text: #2F5E22; } .wblock.f6 { --wb-bg: #F8DDE5; --wb-text: #7E2346; } .wblock.f7 { --wb-bg: #F3EBD3; --wb-text: #5E4812; } .wblock.f8 { --wb-bg: #E2E7EE; --wb-text: #34404F; }
+.fc-blau { --fc-bg: #D6E4FA; --fc-text: #163E7C; } .fc-gruen { --fc-bg: #D5EFD5; --fc-text: #1D5C25; } .fc-rot { --fc-bg: #F9D9D9; --fc-text: #7F1A1A; } .fc-orange { --fc-bg: #FCE3CC; --fc-text: #7A3E0E; } .fc-lila { --fc-bg: #E6DDF6; --fc-text: #4B347D; }
+.fc-tuerkis { --fc-bg: #D2EFEC; --fc-text: #145A53; } .fc-gelb { --fc-bg: #F7EDC2; --fc-text: #5E4A00; } .fc-pink { --fc-bg: #F8DBE8; --fc-text: #7E2346; } .fc-braun { --fc-bg: #EDE1D3; --fc-text: #5A3A1A; } .fc-grau { --fc-bg: #E3E7EC; --fc-text: #333D4C; }
+@media (prefers-color-scheme: dark) {
+  .wblock.f1 { --wb-bg: #1F3152; --wb-text: #BFD3FA; } .wblock.f2 { --wb-bg: #173B38; --wb-text: #A6E3D8; } .wblock.f3 { --wb-bg: #3E2718; --wb-text: #F2C7A6; } .wblock.f4 { --wb-bg: #2E2645; --wb-text: #D3C4F5; }
+  .wblock.f5 { --wb-bg: #213820; --wb-text: #C2E6B2; } .wblock.f6 { --wb-bg: #3F1F2B; --wb-text: #F2BCD0; } .wblock.f7 { --wb-bg: #36301A; --wb-text: #EBD9A3; } .wblock.f8 { --wb-bg: #252D3A; --wb-text: #C9D3E0; }
+  .fc-blau { --fc-bg: #1D3357; --fc-text: #C3D6FA; } .fc-gruen { --fc-bg: #1C3A20; --fc-text: #BFE6C3; } .fc-rot { --fc-bg: #45201F; --fc-text: #F6C4C4; } .fc-orange { --fc-bg: #43291A; --fc-text: #F5CFAE; } .fc-lila { --fc-bg: #2E2645; --fc-text: #D3C4F5; }
+  .fc-tuerkis { --fc-bg: #17393A; --fc-text: #A9E5DE; } .fc-gelb { --fc-bg: #3A341A; --fc-text: #F0E2A6; } .fc-pink { --fc-bg: #3F1F2E; --fc-text: #F4C2D8; } .fc-braun { --fc-bg: #352A20; --fc-text: #E6D2BC; } .fc-grau { --fc-bg: #262C36; --fc-text: #D0D7E1; }
+}
+.wblock.fc { --wb-bg: var(--fc-bg); --wb-text: var(--fc-text); }
+/* eigene Einträge (Aufsicht, Supplierung …) – Farben wie im Programm, dunkle Schrift */
+.wblock.eigen { color: #1C2330; --wb-text: #1C2330; } .wblock.eigen .wb-zeit { color: #3A4456; }
+.ep-p0 { --wb-bg: #C9D1DD; } .ep-p1 { --wb-bg: #A9C8F0; } .ep-p2 { --wb-bg: #9AD7CD; } .ep-p3 { --wb-bg: #C8B8EC; } .ep-p4 { --wb-bg: #F2C79F; } .ep-p5 { --wb-bg: #F1B3C6; } .ep-p6 { --wb-bg: #E3D39A; }
+.ep-p7 { --wb-bg: #B9C4D3; } .ep-p8 { --wb-bg: #A6DB9E; } .ep-p9 { --wb-bg: #F4A99E; } .ep-p10 { --wb-bg: #93D3EE; } .ep-p11 { --wb-bg: #E6B3E3; } .ep-p12 { --wb-bg: #F5DD7A; } .ep-p13 { --wb-bg: #D3C1A5; }
+/* Quer gehalten: mehr Platz je Block */
+@media (min-width: 600px) { .wblock { font-size: 12px; padding: 3px 6px; } .wb-titel { font-size: 13px; } .wb-zeit, .wb-status, .wb-marken span { font-size: 10.5px; } .woche { grid-template-columns: 40px repeat(5, minmax(0, 1fr)); } .wz-zeit { font-size: 11.5px; } .wt-kopf { flex-direction: row; gap: 4px; font-size: 13px; } .wt-kopf b { font-size: 13px; } }
+/* Details einer Stunde: Blatt von unten */
+.blatt-huelle { position: fixed; inset: 0; z-index: 30; background: rgba(0, 0, 0, .35); display: flex; align-items: flex-end; justify-content: center; }
+.blatt { background: var(--flaeche); color: var(--text); width: 100%; max-width: 640px; max-height: 80vh; overflow: auto; border-radius: 16px 16px 0 0; padding: 16px 18px calc(16px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 20px rgba(0, 0, 0, .2); }
+.blatt h2.blatt-titel { text-transform: none; letter-spacing: 0; color: var(--text); font-size: 20px; margin: 0 0 4px; }
+.blatt h3 { font-size: 13px; text-transform: uppercase; color: var(--ged); margin: 14px 0 4px; letter-spacing: .03em; }
+.blatt p { margin: 4px 0; }
+.blatt ul { margin: 4px 0; padding-left: 20px; }
+.plan-zeile { margin: 4px 0 8px; }
+.blatt-knoepfe { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+.blatt-knoepfe .knopf { flex: 1; }
