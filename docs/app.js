@@ -190,8 +190,7 @@
         <table class="noten"><thead><tr><th>Name</th><th>Ø</th><th>Note</th><th title="Mitarbeit">MA</th></tr></thead><tbody>
         ${zeilen.map(({ s, r }) => `<tr data-go="#schueler/${k.id}/${s.id}" class="${r.fruehwarnung ? 'fw' : ''}"><td>${esc(s.name)}${rollenMarken(s)}${r.offen.length ? ` <span class="marke">${r.offen.length} offen</span>` : ''}</td><td>${r.schnitt !== null ? Calc.fmt(r.schnitt, 2) : '–'}</td><td><span class="note ${r.note ? 'st' + r.note : ''}">${esc(notenText(r.note))}</span>${r.grenzfall ? '<small title="Grenzfall">±</small>' : ''}${(s.zeugnisnote !== null && s.zeugnisnote !== undefined && s.zeugnisnote !== '') ? `<small> Z ${esc(notenText(Number(s.zeugnisnote)))}</small>` : ''}</td><td>${r.tendenz || ''}<small> ${r.plus}/${r.minus}</small></td></tr>`).join('')}
         </tbody></table>
-        <h2>ToDos der Klasse</h2><div class="liste">${offeneTodos(k).map(x => todoZeile(x, k)).join('') || '<p class="ged klein">Keine offenen ToDos.</p>'}</div>
-        <form class="neu" data-todo-neu="${k.id}"><input name="text" placeholder="Neues ToDo für ${esc(k.name)}" maxlength="300" autocomplete="off"><button class="knopf primaer">+</button></form>`;
+        ${offeneTodos(k).length ? `<h2>ToDos der Klasse</h2><div class="liste">${offeneTodos(k).map(x => todoZeile(x, k)).join('')}</div>` : ''}`;
     },
     schueler(p) {
       const k = klasse(p[0]); const s = k && k.schueler.find(x => x.id === p[1]); if (!s) return '<p>Nicht gefunden.</p>';
@@ -219,7 +218,12 @@
     todos() {
       const gruppen = [{ k: null, name: 'Allgemein' }, ...Z.st.klassen.filter(k => offeneTodos(k).length || laeuft(k)).map(k => ({ k, name: k.name + ' ' + k.fach }))];
       return `<h1>ToDos</h1>
-        <form class="neu" data-todo-neu=""><select name="klasse" aria-label="Für"><option value="">Allgemein</option>${Z.st.klassen.filter(laeuft).map(k => `<option value="${k.id}">${esc(k.name)} ${esc(k.fach)}</option>`).join('')}</select><input name="text" placeholder="Neues ToDo" maxlength="300" autocomplete="off"><button class="knopf primaer">+</button></form>
+        <form class="todo-form" data-todo-neu="">
+          <input name="text" placeholder="Was ist zu tun?" maxlength="300" autocomplete="off" required>
+          <div class="zeile2"><select name="klasse" aria-label="Wo?"><option value="">Allgemein</option>${Z.st.klassen.filter(laeuft).map(k => `<option value="${k.id}">${esc(k.name)} ${esc(k.fach)}</option>`).join('')}</select>
+            <select name="schueler" aria-label="Schüler/in" hidden><option value="">ganze Klasse</option></select></div>
+          <div class="zeile2"><label class="klein ged">Fällig bis <input type="date" name="faellig"></label><button class="knopf primaer">+ ToDo</button></div>
+        </form>
         ${gruppen.map(g => { const l = offeneTodos(g.k); return l.length ? `<h2>${esc(g.name)}</h2><div class="liste">${l.map(x => todoZeile(x, g.k)).join('')}</div>` : ''; }).join('') || '<p class="ged">Keine offenen ToDos. 🎉</p>'}`;
     },
     einstellungen() {
@@ -345,6 +349,12 @@
     } catch (x) { if (!Z.st) einrichtung(x.message); else meldung(x.message, 'fehler'); }
   });
   document.addEventListener('change', e => {
+    const f = e.target.closest('form.todo-form');
+    if (f && e.target.name === 'klasse') {
+      const k = klasse(e.target.value), sel = f.schueler;
+      sel.innerHTML = '<option value="">ganze Klasse</option>' + (k ? k.schueler.map(x => `<option value="${x.id}">${esc(x.name)}</option>`).join('') : '');
+      sel.hidden = !k; return;
+    }
     const c = e.target.closest('[data-todo]');
     if (!c) return;
     const [kid, tid] = c.dataset.todo.split('|');
@@ -363,7 +373,9 @@
     if (f.dataset.todoNeu !== undefined) {
       const text = f.text.value.trim(); if (!text) return;
       const kid = f.dataset.todoNeu || (f.klasse ? f.klasse.value : '');
-      await D.aendern(st => { const k = kid ? st.klassen.find(x => x.id === kid) : null; const l = k ? (k.todos = k.todos || []) : (st.todos = st.todos || []); l.push({ id: uid(), text: text.slice(0, 300), erstellt: new Date().toISOString(), datum: heute(), stunde: null, erledigt: null }); });
+      const sid = kid && f.schueler ? f.schueler.value : '';
+      const fae = f.faellig && /^\d{4}-\d{2}-\d{2}$/.test(f.faellig.value) ? f.faellig.value : '';
+      await D.aendern(st => { const k = kid ? st.klassen.find(x => x.id === kid) : null; const l = k ? (k.todos = k.todos || []) : (st.todos = st.todos || []); const t = { id: uid(), text: text.slice(0, 300), erstellt: new Date().toISOString(), datum: heute(), stunde: null, erledigt: null }; if (sid) t.schueler = sid; if (fae) t.faellig = fae; l.push(t); });
       meldung('ToDo eingetragen');
       return;
     }

@@ -166,3 +166,11 @@ body.breit main { max-width: 1100px; padding: 8px 6px; }
 .rolle { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; border-radius: 8px; padding: 0 6px; background: var(--grund); border: 1px solid var(--linie); color: var(--akzent); vertical-align: 2px; }
 h1 .rolle { font-size: 13px; font-weight: 600; }
 h2.rot { color: var(--rot); }
+/* ToDo anlegen (nur auf der ToDo-Seite) */
+form.todo-form { display: flex; flex-direction: column; gap: 8px; background: var(--flaeche); border: 1px solid var(--linie); border-radius: 12px; padding: 10px; margin-bottom: 8px; }
+form.todo-form input, form.todo-form select { font: inherit; padding: 10px 12px; border: 1px solid var(--linie); border-radius: 10px; background: var(--flaeche); color: var(--text); min-height: 44px; min-width: 0; }
+form.todo-form .zeile2 { display: flex; gap: 8px; align-items: center; }
+form.todo-form .zeile2 > * { flex: 1; }
+form.todo-form .zeile2 label { display: flex; align-items: center; gap: 6px; }
+form.todo-form .zeile2 label input { flex: 1; }
+form.todo-form .knopf.primaer { flex: 0 0 auto; }
