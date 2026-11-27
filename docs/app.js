@@ -252,7 +252,10 @@
     let p = 0, m = 0, o = 0;
     if (k) k.schueler.forEach(x => (x.mitarbeit || []).forEach(y => { if (y.stunde === s.id) { if (y.wert === '+') p++; else if (y.wert === '0') o++; else m++; } }));
     const marken = [todo ? `<span class="wb-todo">☐ ${todo}</span>` : '', s.thema && !plan.length ? '<span>✓ Thema</span>' : '', p + m + o ? `<span>${[p ? '+' + p : '', m ? '−' + m : '', o ? '○' + o : ''].filter(Boolean).join(' ')}</span>` : ''].join('');
-    const ff = k ? fachFarbe(fachDerStunde(k, s)) : null;
+    // 1.3.1: wie im Programm 2.2.3 – Farbe je Fachname (auch ohne Planung); mit Planung geht die Farbe des Fachs der Planung vor
+    const fnF = k ? (S().fachnameFarben || {})[String(k.fach || '').trim().toLowerCase() || String(k.name || '').trim().toLowerCase()] : null;
+    const fn = farbeOk(fnF) ? fnF : null, fp = k ? fachFarbe(fachDerStunde(k, s)) : null;
+    const ff = k ? ((planungAn() && fachDerStunde(k, s)) ? (fp || fn) : (fn || fp)) : null;
     const farbe = ff ? 'fc fc-' + ff : 'f' + (k ? klassenFarbe(k) : 0);
     return `<button class="wblock ${farbe} ${k ? '' : 'offen-zuordnen'} ${kurzKl} ${aus}" data-stunde="${esc(s.id)}" style="${lage}">
       <span class="wb-titel">${k ? `${esc(k.name)} <span class="wb-fach">${esc(k.fach)}</span>` : esc(s.titel)}</span>
